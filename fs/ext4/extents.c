@@ -4739,6 +4739,10 @@ int ext4_ind_migrate(struct inode *inode)
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 
+	if (EXT4_HAS_RO_COMPAT_FEATURE(inode->i_sb,
+				       EXT4_FEATURE_RO_COMPAT_BIGALLOC))
+		return -EOPNOTSUPP;
+
 	down_write(&EXT4_I(inode)->i_data_sem);
 	ret = ext4_ext_check_inode(inode);
 	if (ret)
