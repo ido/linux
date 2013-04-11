@@ -1,5 +1,5 @@
 /*
- * e5500 Power ISA Device Tree Source (include)
+ * B4860DS Device Tree Source
  *
  * Copyright 2012 Freescale Semiconductor Inc.
  *
@@ -20,7 +20,7 @@
  * Foundation, either version 2 of that License or (at your option) any
  * later version.
  *
- * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor "AS IS" AND ANY
+ * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
@@ -32,29 +32,30 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/include/ "fsl/b4860si-pre.dtsi"
+/include/ "b4qds.dts"
+
 / {
-	cpus {
-		power-isa-version = "2.06";
-		power-isa-b;		// Base
-		power-isa-e;		// Embedded
-		power-isa-atb;		// Alternate Time Base
-		power-isa-cs;		// Cache Specification
-		power-isa-ds;		// Decorated Storage
-		power-isa-e.ed;		// Embedded.Enhanced Debug
-		power-isa-e.pd;		// Embedded.External PID
-		power-isa-e.hv;		// Embedded.Hypervisor
-		power-isa-e.le;		// Embedded.Little-Endian
-		power-isa-e.pm;		// Embedded.Performance Monitor
-		power-isa-e.pc;		// Embedded.Processor Control
-		power-isa-ecl;		// Embedded Cache Locking
-		power-isa-exp;		// External Proxy
-		power-isa-fp;		// Floating Point
-		power-isa-fp.r;		// Floating Point.Record
-		power-isa-mmc;		// Memory Coherence
-		power-isa-scpm;		// Store Conditional Page Mobility
-		power-isa-wt;		// Wait
-		power-isa-64;		// 64-bit
-		fsl,eref-deo;		// Data Cache Extended Operations
-		mmu-type = "power-embedded";
+	model = "fsl,B4860QDS";
+	compatible = "fsl,B4860QDS";
+
+	ifc: localbus@ffe124000 {
+		board-control@3,0 {
+			compatible = "fsl,b4860qds-fpga", "fsl,fpga-qixis";
+		};
 	};
+
+	rio: rapidio@ffe0c0000 {
+		reg = <0xf 0xfe0c0000 0 0x11000>;
+
+		port1 {
+			ranges = <0 0 0xc 0x20000000 0 0x10000000>;
+		};
+		port2 {
+			ranges = <0 0 0xc 0x30000000 0 0x10000000>;
+		};
+	};
+
 };
+
+/include/ "fsl/b4860si-post.dtsi"
