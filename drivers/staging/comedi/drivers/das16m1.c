@@ -499,7 +499,7 @@ static irqreturn_t das16m1_interrupt(int irq, void *d)
 	int status;
 	struct comedi_device *dev = d;
 
-	if (dev->attached == 0) {
+	if (!dev->attached) {
 		comedi_error(dev, "premature interrupt");
 		return IRQ_HANDLED;
 	}
@@ -572,8 +572,6 @@ static int das16m1_attach(struct comedi_device *dev,
 	int ret;
 	unsigned int irq;
 	unsigned long iobase;
-
-	dev->board_name = dev->driver->driver_name;
 
 	iobase = it->options[0];
 
