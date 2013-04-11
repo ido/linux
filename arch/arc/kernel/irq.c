@@ -26,7 +26,7 @@
  * -Disable all IRQs (on CPU side)
  * -Optionally, setup the High priority Interrupts as Level 2 IRQs
  */
-void __init arc_init_IRQ(void)
+void __cpuinit arc_init_IRQ(void)
 {
 	int level_mask = 0;
 
@@ -102,7 +102,7 @@ void __init init_onchip_IRQ(void)
 	struct device_node *intc = NULL;
 
 	intc = of_find_compatible_node(NULL, NULL, "snps,arc700-intc");
-	if(!intc)
+	if (!intc)
 		panic("DeviceTree Missing incore intc\n");
 
 	root_domain = irq_domain_add_legacy(intc, NR_IRQS, 0, 0,
