@@ -148,6 +148,7 @@ static struct usb_device_id blacklist_table[] = {
 	{ USB_DEVICE(0x13d3, 0x3393), .driver_info = BTUSB_ATH3012 },
 	{ USB_DEVICE(0x0489, 0xe04e), .driver_info = BTUSB_ATH3012 },
 	{ USB_DEVICE(0x0489, 0xe056), .driver_info = BTUSB_ATH3012 },
+	{ USB_DEVICE(0x0489, 0xe04d), .driver_info = BTUSB_ATH3012 },
 
 	/* Atheros AR5BBU12 with sflash firmware */
 	{ USB_DEVICE(0x0489, 0xe02c), .driver_info = BTUSB_IGNORE },
@@ -245,6 +246,7 @@ struct btusb_data {
 	struct usb_endpoint_descriptor *isoc_rx_ep;
 
 	__u8 cmdreq_type;
+	unsigned long driver_info;
 
 	unsigned int sco_num;
 	int isoc_altsetting;
@@ -698,6 +700,26 @@ static int btusb_flush(struct hci_dev *hdev)
 	return 0;
 }
 
+static int btusb_setup(struct hci_dev *hdev)
+{
+	struct btusb_data *data = hci_get_drvdata(hdev);
+
+	BT_DBG("%s", hdev->name);
+
+	if (data->driver_info & BTUSB_BCM92035) {
+		struct sk_buff *skb;
+		__u8 val = 0x00;
+
+		skb = __hci_cmd_sync(hdev, 0xfc3b, 1, &val, HCI_INIT_TIMEOUT);
+		if (IS_ERR(skb))
+			BT_ERR("BCM92035 command failed (%ld)", -PTR_ERR(skb));
+		else
+			kfree_skb(skb);
+	}
+
+	return 0;
+}
+
 static int btusb_send_frame(struct sk_buff *skb)
 {
 	struct hci_dev *hdev = (struct hci_dev *) skb->dev;
@@ -995,6 +1017,7 @@ static int btusb_probe(struct usb_interface *intf,
 		return -ENODEV;
 
 	data->cmdreq_type = USB_TYPE_CLASS;
+	data->driver_info = id->driver_info;
 
 	data->udev = interface_to_usbdev(intf);
 	data->intf = intf;
@@ -1025,6 +1048,7 @@ static int btusb_probe(struct usb_interface *intf,
 	hdev->open     = btusb_open;
 	hdev->close    = btusb_close;
 	hdev->flush    = btusb_flush;
+	hdev->setup    = btusb_setup;
 	hdev->send     = btusb_send_frame;
 	hdev->notify   = btusb_notify;
 
@@ -1063,17 +1087,6 @@ static int btusb_probe(struct usb_interface *intf,
 			set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
 
 		data->isoc = NULL;
-	}
-
-	if (id->driver_info & BTUSB_BCM92035) {
-		unsigned char cmd[] = { 0x3b, 0xfc, 0x01, 0x00 };
-		struct sk_buff *skb;
-
-		skb = bt_skb_alloc(sizeof(cmd), GFP_KERNEL);
-		if (skb) {
-			memcpy(skb_put(skb, sizeof(cmd)), cmd, sizeof(cmd));
-			skb_queue_tail(&hdev->driver_init, skb);
-		}
 	}
 
 	if (data->isoc) {

@@ -48,12 +48,12 @@ static void hci_cc_inquiry_cancel(struct hci_dev *hdev, struct sk_buff *skb)
 	}
 
 	clear_bit(HCI_INQUIRY, &hdev->flags);
+	smp_mb__after_clear_bit(); /* wake_up_bit advises about this barrier */
+	wake_up_bit(&hdev->flags, HCI_INQUIRY);
 
 	hci_dev_lock(hdev);
 	hci_discovery_set_state(hdev, DISCOVERY_STOPPED);
 	hci_dev_unlock(hdev);
-
-	hci_req_cmd_complete(hdev, HCI_OP_INQUIRY, status);
 
 	hci_conn_check_pending(hdev);
 }
@@ -1600,12 +1600,13 @@ static void hci_inquiry_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 
 	BT_DBG("%s status 0x%2.2x", hdev->name, status);
 
-	hci_req_cmd_complete(hdev, HCI_OP_INQUIRY, status);
-
 	hci_conn_check_pending(hdev);
 
 	if (!test_and_clear_bit(HCI_INQUIRY, &hdev->flags))
 		return;
+
+	smp_mb__after_clear_bit(); /* wake_up_bit advises about this barrier */
+	wake_up_bit(&hdev->flags, HCI_INQUIRY);
 
 	if (!test_bit(HCI_MGMT, &hdev->dev_flags))
 		return;
@@ -2462,7 +2463,9 @@ static void hci_cmd_status_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	if (opcode != HCI_OP_NOP)
 		del_timer(&hdev->cmd_timer);
 
-	hci_req_cmd_status(hdev, opcode, ev->status);
+	if (ev->status ||
+	    (hdev->sent_cmd && !bt_cb(hdev->sent_cmd)->req.event))
+		hci_req_cmd_complete(hdev, opcode, ev->status);
 
 	if (ev->ncmd && !test_bit(HCI_RESET, &hdev->flags)) {
 		atomic_set(&hdev->cmd_cnt, 1);
@@ -3698,7 +3701,26 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 	struct hci_event_hdr *hdr = (void *) skb->data;
 	__u8 event = hdr->evt;
 
+	hci_dev_lock(hdev);
+
+	/* Received events are (currently) only needed when a request is
+	 * ongoing so avoid unnecessary memory allocation.
+	 */
+	if (hdev->req_status == HCI_REQ_PEND) {
+		kfree_skb(hdev->recv_evt);
+		hdev->recv_evt = skb_clone(skb, GFP_KERNEL);
+	}
+
+	hci_dev_unlock(hdev);
+
 	skb_pull(skb, HCI_EVENT_HDR_SIZE);
+
+	if (hdev->sent_cmd && bt_cb(hdev->sent_cmd)->req.event == event) {
+		struct hci_command_hdr *hdr = (void *) hdev->sent_cmd->data;
+		u16 opcode = __le16_to_cpu(hdr->opcode);
+
+		hci_req_cmd_complete(hdev, opcode, 0);
+	}
 
 	switch (event) {
 	case HCI_EV_INQUIRY_COMPLETE:
